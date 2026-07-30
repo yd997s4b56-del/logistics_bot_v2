@@ -76,36 +76,23 @@ async def volume(update:Update, context:ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Шаг 8/8: Желаемая цена (тенге):")
     return PRICE
 
-async def price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def price(update:Update, context:ContextTypes.DEFAULT_TYPE):
     try:
-        price = int(update.message.text.replace(' ', '').replace('₸', ''))
-    except ValueError:
-        await update.message.reply_text("❌ Введите число. Попробуйте ещё раз:")
+        price = int(update.message.text.replace(' ','').replace('₸',''))
+    except:
+        await update.message.reply_text("❌ Введите число:")
         return PRICE
     uid = update.effective_user.id
-    oid = create_order(
-        uid, 
-        context.user_data['fc'], 
-        context.user_data['fa'],
-        context.user_data['tc'], 
-        context.user_data['ta'],
-        context.user_data['cg'], 
-        context.user_data['wt'], 
-        context.user_data['vl'], 
-        price
-    )
+    oid = create_order(uid, context.user_data['fc'], context.user_data['fa'], context.user_data['tc'], context.user_data['ta'], context.user_data['cg'], context.user_data['wt'], context.user_data['vl'], price)
     for aid in ADMIN_IDS:
         try:
             msg = "🆕 Заявка #" + str(oid) + "!" + "\n" + "📍 " + context.user_data['fc'] + " → " + context.user_data['tc'] + "\n" + "📦 " + context.user_data['cg'] + "\n" + "💰 " + str(price) + " ₸"
             await context.bot.send_message(aid, msg)
-        except Exception as e:
-            logger.error(str(e))
-    await update.message.reply_text(
-        "✅ Заявка #" + str(oid) + " создана! После принятия перевозчиком вы сможете уточнить детали.",
-        reply_markup=menu_kb()
-    )
-    for k in ['fc', 'fa', 'tc', 'ta', 'cg', 'wt', 'vl']:
-        context.user_data.pop(k, None)
+        except:
+            pass
+    await update.message.reply_text("✅ Заявка #" + str(oid) + " создана! После принятия перевозчиком вы сможете уточнить детали.", reply_markup=menu_kb())
+    for k in ['fc','fa','tc','ta','cg','wt','vl']:
+        context.user_data.pop(k,None)
     return MENU
 
 async def my_orders(update:Update, context:ContextTypes.DEFAULT_TYPE):
@@ -116,17 +103,9 @@ async def my_orders(update:Update, context:ContextTypes.DEFAULT_TYPE):
         return
     for o in orders:
         em = {'new':'🆕 Новая','accepted':'✅ Принят','in_progress':'🚛 В пути','completed':'✔️','cancelled':'❌'}.get(o['status'],o['status'])
-        lines = [
-            "📦 #" + str(o['order_id']),
-            "📍 " + o['from_city'] + " → " + o['to_city'],
-            "📦 " + o['cargo_type'] + " | ⚖️ " + o['weight'] + " | 📐 " + o['volume'],
-            "💰 " + str(o['price']) + " ₸",
-            "Статус: " + em
-        ]
+        txt = "📦 #" + str(o['order_id']) + "\n" + "📍 " + o['from_city'] + " → " + o['to_city'] + "\n" + "📦 " + o['cargo_type'] + " | ⚖️ " + o['weight'] + " | 📐 " + o['volume'] + "\n" + "💰 " + str(o['price']) + " ₸" + "\n" + "Статус: " + em
         if o['carrier_id']:
-            lines.append("🚛 Перевозчик назначен")
-        txt = "
-".join(lines)
+            txt = txt + "\n" + "🚛 Перевозчик назначен"
         kb = []
         if o['status'] in ('accepted','in_progress'):
             kb.append([InlineKeyboardButton("➕ Добавить детали", callback_data="d_" + str(o['order_id']))])
@@ -137,14 +116,7 @@ async def add_d_cb(update:Update, context:ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     context.user_data['d_oid'] = int(q.data.split('_')[1])
-    await q.edit_message_text("Что уточнить?
-1. Точный адрес подачи
-2. Точный адрес доставки
-3. Время подачи
-4. Контактное лицо
-5. Примечания
-
-Введите номер или название:")
+    await q.edit_message_text("Что уточнить?\n1. Точный адрес подачи\n2. Точный адрес доставки\n3. Время подачи\n4. Контактное лицо\n5. Примечания\n\nВведите номер или название:")
     return D_TYPE
 
 async def d_type(update:Update, context:ContextTypes.DEFAULT_TYPE):
@@ -159,11 +131,10 @@ async def d_val(update:Update, context:ContextTypes.DEFAULT_TYPE):
     add_detail(oid, context.user_data['dt'], update.message.text, 'customer')
     for aid in ADMIN_IDS:
         try:
-            msg = "📝 Детали к #" + str(oid) + "
-" + "Тип: " + context.user_data['dt'] + "
-" + "Значение: " + update.message.text
+            msg = "📝 Детали к #" + str(oid) + "\n" + "Тип: " + context.user_data['dt'] + "\n" + "Значение: " + update.message.text
             await context.bot.send_message(aid, msg)
-        except: pass
+        except:
+            pass
     await update.message.reply_text("✅ Детали добавлены! Админ передаст перевозчику.", reply_markup=menu_kb())
     context.user_data.pop('d_oid',None)
     context.user_data.pop('dt',None)
@@ -175,21 +146,14 @@ async def view_cb(update:Update, context:ContextTypes.DEFAULT_TYPE):
     oid = int(q.data.split('_')[1])
     o = get_order(oid)
     d = get_details(oid)
-    lines = [
-        "📦 #" + str(oid),
-        "🚚 Откуда: " + o['from_city'] + ", " + o['from_address'],
-        "🏁 Куда: " + o['to_city'] + ", " + o['to_address']
-    ]
+    txt = "📦 #" + str(oid) + "\n" + "🚚 Откуда: " + o['from_city'] + ", " + o['from_address'] + "\n" + "🏁 Куда: " + o['to_city'] + ", " + o['to_address']
     if d:
-        lines.append("")
-        lines.append("📋 Доп. детали:")
+        txt = txt + "\n\n📋 Доп. детали:"
         for x in d:
-            lines.append("• " + x['detail_type'] + ": " + x['detail_value'])
+            txt = txt + "\n" + "• " + x['detail_type'] + ": " + x['detail_value']
     else:
-        lines.append("")
-        lines.append("📋 Деталей пока нет.")
-    await q.edit_message_text("
-".join(lines))
+        txt = txt + "\n\n📋 Деталей пока нет."
+    await q.edit_message_text(txt)
 
 async def support(update:Update, context:ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Напишите вопрос:", reply_markup=ReplyKeyboardMarkup([["🔙 Назад"]], resize_keyboard=True))
@@ -211,9 +175,9 @@ async def menu_h(update:Update, context:ContextTypes.DEFAULT_TYPE):
     else:
         for aid in ADMIN_IDS:
             try:
-                await context.bot.send_message(aid, "💬 От заказчика " + str(update.effective_user.id) + ":" + "
-" + t)
-            except: pass
+                await context.bot.send_message(aid, "💬 От заказчика " + str(update.effective_user.id) + ":" + "\n" + t)
+            except:
+                pass
         await update.message.reply_text("✉️ Отправлено администратору.")
         return MENU
 
