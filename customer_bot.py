@@ -76,26 +76,36 @@ async def volume(update:Update, context:ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Шаг 8/8: Желаемая цена (тенге):")
     return PRICE
 
-async def price(update:Update, context:ContextTypes.DEFAULT_TYPE):
+async def price(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        price = int(update.message.text.replace(' ','').replace('₸',''))
-    except:
-        await update.message.reply_text("❌ Введите число:")
+        price = int(update.message.text.replace(' ', '').replace('₸', ''))
+    except ValueError:
+        await update.message.reply_text("❌ Введите число. Попробуйте ещё раз:")
         return PRICE
     uid = update.effective_user.id
-    oid = create_order(uid, context.user_data['fc'], context.user_data['fa'],
-                       context.user_data['tc'], context.user_data['ta'],
-                       context.user_data['cg'], context.user_data['wt'], context.user_data['vl'], price)
+    oid = create_order(
+        uid, 
+        context.user_data['fc'], 
+        context.user_data['fa'],
+        context.user_data['tc'], 
+        context.user_data['ta'],
+        context.user_data['cg'], 
+        context.user_data['wt'], 
+        context.user_data['vl'], 
+        price
+    )
     for aid in ADMIN_IDS:
         try:
-            msg = "🆕 Заявка #" + str(oid) + "!" + "
-" + "📍 " + context.user_data['fc'] + " → " + context.user_data['tc'] + "
-" + "📦 " + context.user_data['cg'] + "
-" + "💰 " + str(price) + " ₸"
+            msg = "🆕 Заявка #" + str(oid) + "!" + "\n" + "📍 " + context.user_data['fc'] + " → " + context.user_data['tc'] + "\n" + "📦 " + context.user_data['cg'] + "\n" + "💰 " + str(price) + " ₸"
             await context.bot.send_message(aid, msg)
-        except: pass
-    await update.message.reply_text("✅ Заявка #" + str(oid) + " создана! После принятия перевозчиком вы сможете уточнить детали.", reply_markup=menu_kb())
-    for k in ['fc','fa','tc','ta','cg','wt','vl']: context.user_data.pop(k,None)
+        except Exception as e:
+            logger.error(str(e))
+    await update.message.reply_text(
+        "✅ Заявка #" + str(oid) + " создана! После принятия перевозчиком вы сможете уточнить детали.",
+        reply_markup=menu_kb()
+    )
+    for k in ['fc', 'fa', 'tc', 'ta', 'cg', 'wt', 'vl']:
+        context.user_data.pop(k, None)
     return MENU
 
 async def my_orders(update:Update, context:ContextTypes.DEFAULT_TYPE):
